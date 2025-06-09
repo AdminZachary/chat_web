@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('receive_message', (msg) => {
-        // **核心修改：增加对取消消息的处理**
         if (msg.type === 'file_upload_cancelled') {
             const msgEl = document.getElementById(`msg-${msg.temp_id}`);
             if (msgEl) msgEl.remove();
@@ -127,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if(activeContact && (msg.sender_username === activeContact.username || msg.recipient_username === activeContact.username)) {
             renderOrUpdateMessage(msg);
-        } else { /* TODO: Notification for non-active chat */ }
+        }
     });
 
     messageForm.addEventListener('submit', (e) => {
@@ -139,11 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // **核心修改：重构消息渲染/更新函数**
     function renderOrUpdateMessage(msg) {
         const tempId = msg.temp_id;
         let msgEl = tempId ? document.getElementById(`msg-${tempId}`) : null;
-
         const isSent = msg.sender_username === currentUser.username;
         const sender = isSent ? currentUser : (friends.find(f => f.username === msg.sender_username) || { username: msg.sender_username, avatar: msg.sender_avatar, nickname: msg.sender_nickname });
 
@@ -160,14 +157,13 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (msg.type) {
             case 'file_uploading':
                 const senderNickname = isSent ? '你' : (sender.nickname || msg.sender_username);
-                // **核心修复：明确地构建提示信息，防止undefined**
                 const uploadingText = `${senderNickname} 正在发送: ${msg.filename || '一个文件...'}`;
                 bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">${uploadingText}</span></div></div>`;
                 break;
             case 'file':
                 bubbleHTML = `<a href="${msg.url}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || '文件'}</span></div></a>`;
                 break;
-            default: // text
+            default:
                 bubbleHTML = `<div class="message-bubble">${msg.content}</div>`;
                 break;
         }
@@ -179,39 +175,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // **核心修改：重构文件上传逻辑**
+    // --- File Upload with Progress ---
     fileBtn.addEventListener('click', () => {
-        if (currentUploadXHR) {
-            alert('请等待当前文件上传完成。');
-            return;
-        }
+        if (currentUploadXHR) { alert('请等待当前文件上传完成。'); return; }
         fileInput.click();
     });
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file || !activeContact) return;
-
         const tempId = `temp_${Date.now()}`;
         
-        // 1. 发送占位消息
         socket.emit('send_message', {
-            recipient_username: activeContact.username,
-            type: 'file_uploading',
-            filename: file.name,
-            temp_id: tempId,
+            recipient_username: activeContact.username, type: 'file_uploading',
+            filename: file.name, temp_id: tempId,
         });
-        // 渲染本地占位消息
         renderOrUpdateMessage({
-            sender_username: currentUser.username,
-            type: 'file_uploading',
-            filename: file.name,
-            temp_id: tempId,
-            timestamp: Date.now()
+            sender_username: currentUser.username, type: 'file_uploading',
+            filename: file.name, temp_id: tempId, timestamp: Date.now()
         });
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        // 2. 开始上传
         const formData = new FormData();
         formData.append('file', file);
         currentUploadXHR = new XMLHttpRequest();
@@ -222,35 +206,26 @@ document.addEventListener('DOMContentLoaded', () => {
             fileInput.value = '';
             currentUploadXHR = null;
             if (isCancelled) {
-                socket.emit('send_message', {
-                    recipient_username: activeContact.username,
-                    type: 'file_upload_cancelled',
-                    temp_id: temp_id_to_clean
-                });
+                socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_upload_cancelled', temp_id: temp_id_to_clean });
                 document.getElementById(`msg-${temp_id_to_clean}`)?.remove();
             }
         };
 
         currentUploadXHR.onload = function() {
+            // **核心修复：无论成功或失败，都调用清理函数**
+            let wasSuccess = false;
             if (currentUploadXHR.status === 200) {
                 const result = JSON.parse(currentUploadXHR.responseText);
                 if (result.success) {
-                    // 3. 上传成功，发送最终的文件消息
+                    wasSuccess = true;
                     socket.emit('send_message', {
-                        recipient_username: activeContact.username,
-                        type: 'file',
-                        url: result.file_url,
-                        filename: file.name,
-                        temp_id: tempId
+                        recipient_username: activeContact.username, type: 'file',
+                        url: result.file_url, filename: file.name, temp_id: tempId
                     });
-                } else {
-                    alert('文件上传失败: ' + (result.error || '未知错误'));
-                    cleanupAndNotify(true, tempId);
-                }
-            } else {
-                alert('文件上传失败: 服务器错误.');
-                cleanupAndNotify(true, tempId);
-            }
+                } else { alert('文件上传失败: ' + (result.error || '未知错误')); }
+            } else { alert('文件上传失败: 服务器错误.'); }
+            // 如果上传不成功，则视为取消，以移除占位符
+            cleanupAndNotify(!wasSuccess, tempId);
         };
 
         currentUploadXHR.onerror = () => { alert('网络错误，上传中断。'); cleanupAndNotify(true, tempId); };
