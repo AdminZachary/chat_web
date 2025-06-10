@@ -12,7 +12,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="user-profile">
-                    <img id="current-user-avatar" src="" alt="Avatar">
+                    <img id="current-user-avatar" src="" alt="Avatar" title="点击更换头像">
                     <h4 id="current-user-nickname"></h4>
                 </div>
                 <div class="sidebar-actions">
@@ -26,50 +26,24 @@
         </aside>
 
         <main class="chat-area">
-            <div id="welcome-panel" class="welcome-panel">
-                <h2>欢迎来到即时通讯</h2>
-                <p>从左侧选择一位好友开始聊天，或添加新好友。</p>
-            </div>
+            <div id="welcome-panel" class="welcome-panel"><h2>欢迎来到即时通讯</h2><p>从左侧选择一位好友开始聊天，或添加新好友。</p></div>
             <div id="chat-panel" class="chat-panel" style="display: none;">
-                <header class="chat-header">
-                    <button class="back-btn" id="back-to-contacts-btn">←</button>
-                    <div class="chat-header-info">
-                        <h4 id="chat-with-name"></h4>
-                        <p id="chat-with-status"></p>
-                    </div>
-                </header>
+                <header class="chat-header"><button class="back-btn" id="back-to-contacts-btn">←</button><div class="chat-header-info"><h4 id="chat-with-name"></h4><p id="chat-with-status"></p></div></header>
                 <div class="messages" id="messages"></div>
                 <div class="message-input">
-                    <div id="upload-progress-container" style="display: none;">
-                        <span id="upload-progress-text"></span>
-                        <div class="progress-bar-wrapper">
-                            <div class="progress-bar-background">
-                                <div id="upload-progress-bar"></div>
-                            </div>
-                            <button id="cancel-upload-btn" class="cancel-btn">&times;</button>
-                        </div>
-                    </div>
+                    <div id="upload-progress-container" style="display: none;"><span id="upload-progress-text"></span><div class="progress-bar-wrapper"><div class="progress-bar-background"><div id="upload-progress-bar"></div></div><button id="cancel-upload-btn" class="cancel-btn">&times;</button></div></div>
                     <div id="emoji-panel"></div>
-                    <div class="input-actions">
-                        <button class="action-btn" id="emoji-btn">😀</button>
-                        <button class="action-btn" id="file-btn">📎</button>
-                        <input type="file" id="file-input" style="display: none;" />
-                    </div>
-                    <form id="message-form">
-                        <input type="text" id="message-input-box" placeholder="正在连接..." autocomplete="off" disabled>
-                        <button type="submit" class="send-btn" disabled>➤</button>
-                    </form>
+                    <div class="input-actions"><button class="action-btn" id="emoji-btn">😀</button><button class="action-btn" id="file-btn">📎</button><input type="file" id="file-input" style="display: none;" /></div>
+                    <form id="message-form"><input type="text" id="message-input-box" placeholder="正在连接..." autocomplete="off" disabled><button type="submit" class="send-btn" disabled>➤</button></form>
                 </div>
             </div>
         </main>
     </div>
 
-    <div id="add-friend-modal" class="modal">
-        <div class="modal-content"><span class="close-btn">&times;</span><h2>添加好友</h2><form id="user-search-form" class="search-form"><input type="search" id="user-search-input" placeholder="输入要查找的用户名..." required><button type="submit" class="search-btn">查找</button></form><div id="user-search-results"></div></div>
-    </div>
-    <div id="friend-requests-modal" class="modal">
-         <div class="modal-content"><span class="close-btn">&times;</span><h2>好友请求</h2><div id="friend-requests-list"></div></div>
-    </div>
+    <div id="add-friend-modal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2>添加好友</h2><form id="user-search-form" class="search-form"><input type="search" id="user-search-input" placeholder="输入要查找的用户名..." required><button type="submit" class="search-btn">查找</button></form><div id="user-search-results"></div></div></div>
+    <div id="friend-requests-modal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2>好友请求</h2><div id="friend-requests-list"></div></div></div>
+    
+    <input type="file" id="avatar-upload-input" accept="image/png, image/jpeg, image/gif" style="display: none;">
 
     <script src="/static/js/main.js"></script>
 </body>
