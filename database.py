@@ -2,6 +2,8 @@ import sqlite3
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from itertools import combinations
+# 新增：导入 datetime 用于处理时间
+from datetime import datetime, timezone
 
 DATABASE_FILE = 'chat.db'
 
@@ -17,18 +19,26 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, nickname TEXT NOT NULL, avatar TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender_username TEXT NOT NULL, recipient_username TEXT NOT NULL, content TEXT, message_type TEXT NOT NULL DEFAULT \'text\', file_url TEXT, filename TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)')
+    
+    # **核心修改：将 timestamp 列的类型改为 TEXT，不再使用数据库默认时间**
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_username TEXT NOT NULL,
+        recipient_username TEXT NOT NULL,
+        content TEXT,
+        message_type TEXT NOT NULL DEFAULT 'text',
+        file_url TEXT,
+        filename TEXT,
+        timestamp TEXT NOT NULL
+    )''')
+    
     cursor.execute('CREATE TABLE IF NOT EXISTS friendships (id INTEGER PRIMARY KEY AUTOINCREMENT, user1_username TEXT NOT NULL, user2_username TEXT NOT NULL, status TEXT NOT NULL, action_user TEXT NOT NULL, UNIQUE(user1_username, user2_username))')
     conn.commit()
     conn.close()
     
     print("Adding preset users...")
-    preset_users = [
-        ('user1', 'pass123', '爱丽丝'),
-        ('user2', 'pass123', '鲍勃'),
-        ('user3', 'pass123', '查理'),
-        ('user4', 'pass123', '黛安娜')
-    ]
+    preset_users = [('user1', 'pass123', '爱丽丝'), ('user2', 'pass123', '鲍勃'), ('user3', 'pass123', '查理'), ('user4', 'pass123', '黛安娜')]
     for username, password, nickname in preset_users:
         add_user(username, password, nickname)
     
@@ -38,6 +48,17 @@ def init_db():
         add_accepted_friendship(user1, user2)
     print("Database initialized.")
 
+# **核心修改：save_message 函数现在需要一个明确的 timestamp 参数**
+def save_message(sender, recipient, content, msg_type, file_url, filename, timestamp_iso):
+    conn = get_db_connection()
+    conn.execute(
+        'INSERT INTO messages (sender_username, recipient_username, content, message_type, file_url, filename, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (sender, recipient, content, msg_type, file_url, filename, timestamp_iso)
+    )
+    conn.commit()
+    conn.close()
+
+# ... (其他所有函数保持不变) ...
 def add_accepted_friendship(user1, user2):
     conn = get_db_connection()
     try:
@@ -46,34 +67,25 @@ def add_accepted_friendship(user1, user2):
         conn.commit()
     except sqlite3.IntegrityError: pass
     finally: conn.close()
-
 def add_user(username, password, nickname, avatar=None):
     conn = get_db_connection()
     try:
         if not avatar:
-            # ======================================================================
-            # **核心修改：应用莫兰迪色系，并将头像变为圆形**
-            # ======================================================================
             morandi_colors = "c0a0a0,b0c4b1,a4b4a9,a4a9b4,c0b0a0"
             avatar = f'https://api.dicebear.com/8.x/initials/svg?seed={nickname}&backgroundColor={morandi_colors}&radius=50&fontSize=45'
-        
         password_hash = generate_password_hash(password)
         conn.execute('INSERT INTO users (username, password_hash, nickname, avatar) VALUES (?, ?, ?, ?)', (username, password_hash, nickname, avatar))
         conn.commit()
         return True
     except sqlite3.IntegrityError: return False
     finally: conn.close()
-
 def update_user_avatar(username, avatar_url):
     conn = get_db_connection()
     conn.execute('UPDATE users SET avatar = ? WHERE username = ?', (avatar_url, username))
     conn.commit()
     conn.close()
-
 def get_user(username):
     conn = get_db_connection(); user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone(); conn.close(); return user
-def save_message(sender, recipient, content, msg_type='text', file_url=None, filename=None):
-    conn = get_db_connection(); conn.execute('INSERT INTO messages (sender_username, recipient_username, content, message_type, file_url, filename) VALUES (?, ?, ?, ?, ?, ?)', (sender, recipient, content, msg_type, file_url, filename)); conn.commit(); conn.close()
 def get_chat_history(user1, user2):
     conn = get_db_connection(); messages = conn.execute('SELECT m.*, u.nickname as sender_nickname, u.avatar as sender_avatar FROM messages m JOIN users u ON m.sender_username = u.username WHERE (sender_username = ? AND recipient_username = ?) OR (sender_username = ? AND recipient_username = ?) ORDER BY timestamp ASC', (user1, user2, user2, user1)).fetchall(); conn.close(); return [dict(msg) for msg in messages]
 def search_users_by_prefix(prefix, current_user):
