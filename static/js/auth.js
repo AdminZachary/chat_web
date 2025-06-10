@@ -47,11 +47,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = document.getElementById('register-username').value;
         const nickname = document.getElementById('register-nickname').value;
         const password = document.getElementById('register-password').value;
+        // **新增：获取并校验确认密码**
+        const passwordConfirm = document.getElementById('register-password-confirm').value;
+
+        if (password !== passwordConfirm) {
+            registerError.textContent = '两次输入的密码不一致。';
+            return;
+        }
         
         const response = await fetch('/api/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, nickname })
+            // **新增：将确认密码一并发送到后端**
+            body: JSON.stringify({ username, password, password_confirm: passwordConfirm, nickname })
         });
 
         const result = await response.json();
