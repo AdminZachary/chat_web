@@ -1,0 +1,259 @@
+# Translations template for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-06-11 13:47+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.14.0\n"
+
+#: app.py:45
+msgid "网络错误，请稍后重试。"
+msgstr ""
+
+#: app.py:46
+msgid "注册成功！请登录。"
+msgstr ""
+
+#: app.py:47
+msgid "两次输入的密码不一致。"
+msgstr ""
+
+#: app.py:48
+msgid "在线"
+msgstr ""
+
+#: app.py:49
+msgid "离线"
+msgstr ""
+
+#: app.py:50
+msgid "没有新的好友请求"
+msgstr ""
+
+#: app.py:51
+msgid "请等待当前文件上传完成。"
+msgstr ""
+
+#: app.py:52
+msgid "文件上传失败: "
+msgstr ""
+
+#: app.py:53
+msgid "文件上传失败: 服务器错误."
+msgstr ""
+
+#: app.py:54
+msgid "网络错误，上传中断。"
+msgstr ""
+
+#: app.py:55
+msgid "正在上传"
+msgstr ""
+
+#: app.py:56
+msgid "已发送"
+msgstr ""
+
+#: app.py:57
+msgid "没有找到用户"
+msgstr ""
+
+#: app.py:58 app.py:227
+msgid "好友请求已发送"
+msgstr ""
+
+#: app.py:59
+msgid "请求已发送"
+msgstr ""
+
+#: app.py:60
+msgid "已是好友"
+msgstr ""
+
+#: app.py:61
+msgid "添加"
+msgstr ""
+
+#: app.py:62 templates/index.html:77
+msgid "正在连接..."
+msgstr ""
+
+#: app.py:63
+msgid "输入消息..."
+msgstr ""
+
+#: app.py:64
+msgid "已断开连接..."
+msgstr ""
+
+#: app.py:65
+msgid "头像上传失败: "
+msgstr ""
+
+#: app.py:66
+msgid "头像上传出错。"
+msgstr ""
+
+#: app.py:79
+msgid "所有字段均为必填项"
+msgstr ""
+
+#: app.py:82
+msgid "用户名只能包含字母、数字和下划线"
+msgstr ""
+
+#: app.py:85
+msgid "两次输入的密码不一致"
+msgstr ""
+
+#: app.py:88
+msgid "该用户名已被注册"
+msgstr ""
+
+#: app.py:91
+msgid "注册成功"
+msgstr ""
+
+#: app.py:93
+msgid "注册过程中发生未知错误"
+msgstr ""
+
+#: app.py:114
+msgid "用户名或密码错误"
+msgstr ""
+
+#: app.py:125 app.py:137
+msgid "没有文件部分"
+msgstr ""
+
+#: app.py:127 app.py:139
+msgid "未选择文件"
+msgstr ""
+
+#: app.py:131
+msgid "文件上传失败"
+msgstr ""
+
+#: app.py:142
+msgid "文件类型不被允许"
+msgstr ""
+
+#: app.py:150
+msgid "头像上传失败"
+msgstr ""
+
+#: templates/index.html:6
+msgid "即时通讯"
+msgstr ""
+
+#: templates/index.html:16
+msgid "开始您的无缝沟通之旅"
+msgstr ""
+
+#: templates/index.html:17
+msgid "实时、安全、可靠。连接无处不在。"
+msgstr ""
+
+#: templates/index.html:22
+msgid "欢迎回来"
+msgstr ""
+
+#: templates/index.html:23
+msgid "登录以继续您的对话。"
+msgstr ""
+
+#: templates/index.html:25 templates/index.html:36
+msgid "用户名"
+msgstr ""
+
+#: templates/index.html:26 templates/index.html:38
+msgid "密码"
+msgstr ""
+
+#: templates/index.html:27
+msgid "登录"
+msgstr ""
+
+#: templates/index.html:30
+msgid "没有账户？"
+msgstr ""
+
+#: templates/index.html:30
+msgid "立即注册"
+msgstr ""
+
+#: templates/index.html:33
+msgid "创建账户"
+msgstr ""
+
+#: templates/index.html:34
+msgid "只需几步，即可加入我们。"
+msgstr ""
+
+#: templates/index.html:37
+msgid "昵称"
+msgstr ""
+
+#: templates/index.html:39
+msgid "确认密码"
+msgstr ""
+
+#: templates/index.html:40
+msgid "注册"
+msgstr ""
+
+#: templates/index.html:43
+msgid "已有账户？"
+msgstr ""
+
+#: templates/index.html:43
+msgid "返回登录"
+msgstr ""
+
+#: templates/index.html:55
+msgid "点击更换头像"
+msgstr ""
+
+#: templates/index.html:59
+msgid "切换主题"
+msgstr ""
+
+#: templates/index.html:60 templates/index.html:85
+msgid "好友请求"
+msgstr ""
+
+#: templates/index.html:61 templates/index.html:84
+msgid "添加好友"
+msgstr ""
+
+#: templates/index.html:62
+msgid "退出登录"
+msgstr ""
+
+#: templates/index.html:69
+msgid "欢迎来到即时通讯"
+msgstr ""
+
+#: templates/index.html:69
+msgid "从左侧选择一位好友开始聊天，或添加新好友。"
+msgstr ""
+
+#: templates/index.html:84
+msgid "输入要查找的用户名..."
+msgstr ""
+
+#: templates/index.html:84
+msgid "查找"
+msgstr ""
+

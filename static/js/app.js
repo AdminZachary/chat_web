@@ -7,7 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let friends = [];
     let currentUploadXHR = null;
 
-    // 认证部分的DOM
+    // --- DOM元素定义 (这是之前缺失的部分) ---
+
+    // 认证部分
     const authWrapper = document.getElementById('auth-wrapper');
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
@@ -18,18 +20,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginContent = document.getElementById('login-form-content');
     const registerContent = document.getElementById('register-form-content');
 
-    // 聊天部分的DOM
+    // 聊天主应用部分
     const appWrapper = document.getElementById('app-wrapper');
     const appContainer = document.getElementById('app-container');
     const messageForm = document.getElementById('message-form');
     const inputBox = document.getElementById('message-input-box');
     const sendBtn = messageForm.querySelector('.send-btn');
+
+    // 文件与上传部分
     const fileBtn = document.getElementById('file-btn');
     const fileInput = document.getElementById('file-input');
     const uploadProgressContainer = document.getElementById('upload-progress-container');
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
     const cancelUploadBtn = document.getElementById('cancel-upload-btn');
+    const avatarUploadInput = document.getElementById('avatar-upload-input');
+
+    // 主界面UI部分
     const contactList = document.getElementById('contact-list');
     const welcomePanel = document.getElementById('welcome-panel');
     const chatPanel = document.getElementById('chat-panel');
@@ -38,10 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentUserNickname = document.getElementById('current-user-nickname');
     const chatWithName = document.getElementById('chat-with-name');
     const chatWithStatus = document.getElementById('chat-with-status');
+    const backToContactsBtn = document.getElementById('back-to-contacts-btn');
+    
+    // 操作与模态框部分
+    const themeSwitcherBtn = document.getElementById('theme-switcher-btn');
     const emojiBtn = document.getElementById('emoji-btn');
     const emojiPanel = document.getElementById('emoji-panel');
-    const backToContactsBtn = document.getElementById('back-to-contacts-btn');
-    const themeSwitcherBtn = document.getElementById('theme-switcher-btn');
     const addFriendBtn = document.getElementById('add-friend-btn');
     const addFriendModal = document.getElementById('add-friend-modal');
     const userSearchForm = document.getElementById('user-search-form');
@@ -52,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const friendRequestsList = document.getElementById('friend-requests-list');
     const modals = document.querySelectorAll('.modal');
     const closeBtns = document.querySelectorAll('.close-btn');
-    const avatarUploadInput = document.getElementById('avatar-upload-input');
     const logoutBtn = document.getElementById('logout-btn');
 
 
@@ -86,10 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.success) {
                 performLoginTransition(result.initial_data);
             } else {
-                loginError.textContent = result.message || '登录失败';
+                loginError.textContent = result.message; // 使用后端传来的翻译
             }
         } catch (error) {
-            loginError.textContent = '网络错误，请稍后重试。';
+            loginError.textContent = translations.error_network;
         }
     });
     
@@ -102,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const passwordConfirm = document.getElementById('register-password-confirm').value;
 
         if (password !== passwordConfirm) {
-            registerError.textContent = '两次输入的密码不一致。';
+            registerError.textContent = translations.error_password_mismatch;
             return;
         }
         
@@ -114,16 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const result = await response.json();
         if (result.success) {
-            alert('注册成功！请登录。');
+            alert(translations.register_success);
             showLoginLink.click();
             loginForm.reset();
             registerForm.reset();
         } else {
-            registerError.textContent = result.message || '注册失败';
+            registerError.textContent = result.message; // 使用后端传来的翻译
         }
     });
 
-    // --- 核心修改：优化过渡动画函数 ---
     function performLoginTransition(initialData) {
         authWrapper.classList.add('fade-zoom-out');
 
@@ -134,12 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
             appWrapper.style.visibility = 'visible';
             appWrapper.classList.add('fade-zoom-in');
             
-            // 使用 requestAnimationFrame 和 setTimeout 来延迟繁重的JS任务
-            // 这可以确保入场动画能够优先、流畅地开始播放
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     initializeChatApp(initialData);
-                }, 50); // 延迟50毫秒，给动画渲染留出充足时间
+                }, 50);
             });
 
         }, { once: true });
@@ -147,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 聊天应用初始化和逻辑 ---
     function initializeChatApp(initialData) {
-        console.log("Initializing chat app with data:", initialData);
         socket = io();
         currentUser = initialData.currentUser;
         friends = initialData.friends;
@@ -160,9 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUserAvatar.src = data.currentUser.avatar;
         currentUserNickname.textContent = data.currentUser.nickname;
         contactList.innerHTML = '';
-        if (data.friends.length === 0) {
-            contactList.innerHTML = '<p style="text-align:center; color: var(--text-secondary-color); padding: 1rem;">暂无好友</p>';
-        } else {
+        if (data.friends.length > 0) {
             data.friends.forEach(friend => {
                 const friendWithStatus = { ...friend, status: 'offline' };
                 contactList.appendChild(createContactElement(friendWithStatus));
@@ -189,69 +191,65 @@ document.addEventListener('DOMContentLoaded', () => {
         chatPanel.style.display = 'flex';
         chatWithName.textContent = friend.nickname;
         const statusEl = document.getElementById(`status-${friend.username}`);
-        chatWithStatus.textContent = statusEl?.classList.contains('online') ? '在线' : '离线';
+        chatWithStatus.textContent = statusEl?.classList.contains('online') ? translations.online : translations.offline;
         socket.emit('load_chat_history', { contact_username: friend.username });
     }
-// adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/static/js/app.js
 
-function renderOrUpdateMessage(msg) {
-    const tempId = msg.temp_id;
-    let msgEl = tempId ? document.getElementById(`msg-${tempId}`) : null;
-    const isSent = msg.sender_username === currentUser.username;
-    const sender = isSent ? currentUser : (friends.find(f => f.username === msg.sender_username) || { username: msg.sender_username, avatar: msg.sender_avatar, nickname: msg.sender_nickname });
+    function renderOrUpdateMessage(msg) {
+        const tempId = msg.temp_id;
+        let msgEl = tempId ? document.getElementById(`msg-${tempId}`) : null;
+        const isSent = msg.sender_username === currentUser.username;
+        const sender = isSent ? currentUser : (friends.find(f => f.username === msg.sender_username) || { username: msg.sender_username, avatar: msg.sender_avatar, nickname: msg.sender_nickname });
 
-    if (!msgEl) {
-        msgEl = document.createElement('div');
-        msgEl.className = `message ${isSent ? 'sent' : 'received'}`;
-        if (tempId) msgEl.id = `msg-${tempId}`;
-        messagesContainer.appendChild(msgEl);
+        if (!msgEl) {
+            msgEl = document.createElement('div');
+            msgEl.className = `message ${isSent ? 'sent' : 'received'}`;
+            if (tempId) msgEl.id = `msg-${tempId}`;
+            messagesContainer.appendChild(msgEl);
+        }
+        
+        if (!sender) { return; }
+
+        let bubbleHTML;
+        const messageType = msg.type || msg.message_type;
+        const imageUrl = msg.local_preview_url || msg.url || msg.file_url;
+        const videoUrl = msg.local_preview_url || msg.url || msg.file_url;
+
+        switch (messageType) {
+            case 'image_uploading':
+                bubbleHTML = `<div class="preview-container uploading"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
+                break;
+            case 'image':
+                bubbleHTML = `<div class="preview-container"><a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"></a></div>`;
+                break;
+            case 'video_uploading':
+                bubbleHTML = `<div class="preview-container uploading"><video src="${videoUrl}" class="video-preview" muted loop autoplay></video><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
+                break;
+            case 'video':
+                bubbleHTML = `<div class="preview-container"><video src="${videoUrl}" class="video-preview" controls></video></div>`;
+                break;
+            case 'file_uploading':
+                bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">${msg.filename}</span></div></div>`;
+                break;
+            case 'file':
+                bubbleHTML = `<a href="${msg.url || msg.file_url}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || 'File'}</span></div></a>`;
+                break;
+            default:
+                bubbleHTML = `<div class="message-bubble">${msg.content}</div>`;
+                break;
+        }
+
+        const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        msgEl.innerHTML = `<img class="avatar avatar-for-${sender.username}" src="${sender.avatar}" alt="Avatar"><div class="text-content">${bubbleHTML}<div class="timestamp">${time}</div></div>`;
+        if (!messageType.includes('uploading')) {
+             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
     }
-    
-    if (!sender) { console.error("Could not find sender for message:", msg); return; }
-
-    let bubbleHTML;
-    const messageType = msg.type || msg.message_type;
-
-    const imageUrl = msg.local_preview_url || msg.url || msg.file_url;
-    const videoUrl = msg.local_preview_url || msg.url || msg.file_url;
-
-    switch (messageType) {
-        case 'image_uploading':
-            bubbleHTML = `<div class="preview-container uploading"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
-            break;
-        case 'image':
-            // --- 这是被修正的行 ---
-            bubbleHTML = `<div class="preview-container"><a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"></a></div>`;
-            break;
-        case 'video_uploading':
-            bubbleHTML = `<div class="preview-container uploading"><video src="${videoUrl}" class="video-preview" muted loop autoplay></video><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
-            break;
-        case 'video':
-            bubbleHTML = `<div class="preview-container"><video src="${videoUrl}" class="video-preview" controls></video></div>`;
-            break;
-        case 'file_uploading':
-            bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">正在发送: ${msg.filename}</span></div></div>`;
-            break;
-        case 'file':
-            bubbleHTML = `<a href="${msg.url || msg.file_url}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || '文件'}</span></div></a>`;
-            break;
-        default: // 'text'
-            bubbleHTML = `<div class="message-bubble">${msg.content}</div>`;
-            break;
-    }
-
-    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    msgEl.innerHTML = `<img class="avatar avatar-for-${sender.username}" src="${sender.avatar}" alt="Avatar"><div class="text-content">${bubbleHTML}<div class="timestamp">${time}</div></div>`;
-    
-    if (!messageType.includes('uploading')) {
-         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-}
 
     function updateFriendRequests(requests) {
         const listIsEmpty = friendRequestsList.querySelector('p');
         if (requests.length === 0 && (!friendRequestsList.hasChildNodes() || listIsEmpty)) {
-            friendRequestsList.innerHTML = '<p>没有新的好友请求</p>';
+            friendRequestsList.innerHTML = `<p>${translations.no_friend_requests}</p>`;
             return;
         }
         if (listIsEmpty) friendRequestsList.innerHTML = '';
@@ -260,7 +258,7 @@ function renderOrUpdateMessage(msg) {
             const reqEl = document.createElement('div');
             reqEl.className = 'request-item';
             reqEl.id = `request-${req.username}`;
-            reqEl.innerHTML = `<div class="result-info"><img src="${req.avatar}"><span>${req.nickname} (${req.username})</span></div><div><button class="accept-btn" data-username="${req.username}">接受</button><button class="decline-btn" data-username="${req.username}">拒绝</button></div>`;
+            reqEl.innerHTML = `<div class="result-info"><img src="${req.avatar}"><span>${req.nickname} (${req.username})</span></div><div><button class="accept-btn" data-username="${req.username}">Accept</button><button class="decline-btn" data-username="${req.username}">Decline</button></div>`;
             friendRequestsList.appendChild(reqEl);
         });
     }
@@ -275,11 +273,7 @@ function renderOrUpdateMessage(msg) {
 
     function bindChatEventListeners() {
         themeSwitcherBtn.addEventListener('click', () => {
-            const htmlEl = document.documentElement;
-            const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
-            htmlEl.className = newTheme;
-            themeSwitcherBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-            localStorage.setItem('theme', newTheme);
+            document.documentElement.classList.toggle('dark');
         });
 
         addFriendBtn.onclick = () => addFriendModal.classList.add('show');
@@ -321,134 +315,120 @@ function renderOrUpdateMessage(msg) {
                 if (data.success) {
                     updateAllAvatarInstances(currentUser.username, data.new_avatar_url);
                     currentUser.avatar = data.new_avatar_url;
-                } else { alert('头像上传失败: ' + data.error); }
+                } else { alert(translations.avatar_upload_failed + data.error); }
             })
-            .catch(error => { console.error('Error uploading avatar:', error); alert('头像上传出错。'); })
+            .catch(error => { alert(translations.avatar_upload_error); })
             .finally(() => { avatarUploadInput.value = ''; });
         });
-
+        
         const emojis = ['😀', '😂', '😊', '😍', '🤔', '👍', '🙏', '🎉', '🚀', '❤️', '🔥', '💯'];
         emojis.forEach(emoji => { const span = document.createElement('span'); span.textContent = emoji; span.addEventListener('click', () => { inputBox.value += emoji; emojiPanel.style.display = 'none'; inputBox.focus(); }); emojiPanel.appendChild(span); });
         emojiBtn.addEventListener('click', (e) => { e.stopPropagation(); emojiPanel.style.display = emojiPanel.style.display === 'block' ? 'none' : 'block'; });
         document.addEventListener('click', (e) => { if (!emojiPanel.contains(e.target) && e.target !== emojiBtn) emojiPanel.style.display = 'none'; });
 
-        fileBtn.addEventListener('click', () => { if (currentUploadXHR) { alert('请等待当前文件上传完成。'); return; } fileInput.click(); });
-// adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/static/js/app.js
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file || !activeContact) return;
+        fileBtn.addEventListener('click', () => { if (currentUploadXHR) { alert(translations.upload_wait); return; } fileInput.click(); });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file || !activeContact) return;
 
-    const tempId = `temp_${Date.now()}`;
-    const fileType = file.type.split('/')[0]; // "image", "video", 或其他
-    let messageType;
-    let localPreviewUrl = null;
+            const tempId = `temp_${Date.now()}`;
+            const fileType = file.type.split('/')[0];
+            let messageType;
+            let localPreviewUrl = null;
 
-    // 1. 判断文件类型并创建本地预览URL
-    if (fileType === 'image' || fileType === 'video') {
-        messageType = `${fileType}_uploading`;
-        localPreviewUrl = URL.createObjectURL(file);
-    } else {
-        messageType = 'file_uploading';
-    }
-
-    // 2. 发送一个 "uploading" 状态的消息，其中包含预览信息
-    const uploadingMessage = {
-        recipient_username: activeContact.username,
-        type: messageType,
-        filename: file.name,
-        temp_id: tempId,
-        // 添加本地URL用于即时预览
-        local_preview_url: localPreviewUrl 
-    };
-    socket.emit('send_message', uploadingMessage);
-    
-    // 立即使用本地预览渲染上传中的消息
-    renderOrUpdateMessage({
-        ...uploadingMessage,
-        sender_username: currentUser.username, 
-        timestamp: new Date().toISOString()
-    });
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    // 3. 执行实际的上传操作
-    const formData = new FormData();
-    formData.append('file', file);
-    currentUploadXHR = new XMLHttpRequest();
-    currentUploadXHR.open('POST', '/upload', true);
-
-    const cleanupAndNotify = (isCancelled = false, temp_id_to_clean) => {
-        uploadProgressContainer.style.display = 'none';
-        fileInput.value = '';
-        currentUploadXHR = null;
-        // 释放Object URL以节省内存
-        if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-        if (isCancelled) {
-            socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_upload_cancelled', temp_id: temp_id_to_clean });
-            document.getElementById(`msg-${temp_id_to_clean}`)?.remove();
-        }
-    };
-
-    currentUploadXHR.onload = function() {
-        let wasSuccess = false;
-        if (currentUploadXHR.status === 200) {
-            const result = JSON.parse(currentUploadXHR.responseText);
-            if (result.success) {
-                wasSuccess = true;
-                // 4. 上传成功后，发送带有永久URL的最终消息
-                const finalMessageType = (fileType === 'image' || fileType === 'video') ? fileType : 'file';
-                socket.emit('send_message', { 
-                    recipient_username: activeContact.username, 
-                    type: finalMessageType, 
-                    url: result.file_url, 
-                    filename: file.name, 
-                    temp_id: tempId 
-                });
+            if (fileType === 'image' || fileType === 'video') {
+                messageType = `${fileType}_uploading`;
+                localPreviewUrl = URL.createObjectURL(file);
             } else {
-                alert('文件上传失败: ' + (result.error || '未知错误'));
+                messageType = 'file_uploading';
             }
-        } else {
-            alert('文件上传失败: 服务器错误.');
-        }
-        cleanupAndNotify(!wasSuccess, tempId);
-    };
 
-    currentUploadXHR.onerror = () => { alert('网络错误，上传中断。'); cleanupAndNotify(true, tempId); };
-    currentUploadXHR.onabort = () => { console.log('Upload aborted.'); cleanupAndNotify(true, tempId); };
-    currentUploadXHR.upload.onprogress = function(event) { if (event.lengthComputable) { const percent = Math.round((event.loaded / event.total) * 100); uploadProgressContainer.style.display = 'block'; uploadProgressBar.style.width = percent + '%'; uploadProgressText.textContent = `正在上传 ${file.name}... ${percent}%`; } };
-    cancelUploadBtn.onclick = () => { if (currentUploadXHR) currentUploadXHR.abort(); };
-    
-    currentUploadXHR.send(formData);
-});
+            const uploadingMessage = {
+                recipient_username: activeContact.username,
+                type: messageType,
+                filename: file.name,
+                temp_id: tempId,
+                local_preview_url: localPreviewUrl 
+            };
+            socket.emit('send_message', uploadingMessage);
+            
+            renderOrUpdateMessage({
+                ...uploadingMessage,
+                sender_username: currentUser.username, 
+                timestamp: new Date().toISOString()
+            });
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            currentUploadXHR = new XMLHttpRequest();
+            currentUploadXHR.open('POST', '/upload', true);
+
+            const cleanupAndNotify = (isCancelled = false, temp_id_to_clean) => {
+                uploadProgressContainer.style.display = 'none';
+                fileInput.value = '';
+                currentUploadXHR = null;
+                if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+                if (isCancelled) {
+                    socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_upload_cancelled', temp_id: temp_id_to_clean });
+                    document.getElementById(`msg-${temp_id_to_clean}`)?.remove();
+                }
+            };
+
+            currentUploadXHR.onload = function() {
+                let wasSuccess = false;
+                if (currentUploadXHR.status === 200) {
+                    const result = JSON.parse(currentUploadXHR.responseText);
+                    if (result.success) {
+                        wasSuccess = true;
+                        const finalMessageType = (fileType === 'image' || fileType === 'video') ? fileType : 'file';
+                        socket.emit('send_message', { 
+                            recipient_username: activeContact.username, 
+                            type: finalMessageType, 
+                            url: result.file_url, 
+                            filename: file.name, 
+                            temp_id: tempId 
+                        });
+                    } else {
+                        alert(translations.upload_failed + (result.error || ''));
+                    }
+                } else {
+                    alert(translations.upload_failed_server);
+                }
+                cleanupAndNotify(!wasSuccess, tempId);
+            };
+
+            currentUploadXHR.onerror = () => { alert(translations.upload_error_network_interrupted); cleanupAndNotify(true, tempId); };
+            currentUploadXHR.onabort = () => { cleanupAndNotify(true, tempId); };
+            currentUploadXHR.upload.onprogress = function(event) { if (event.lengthComputable) { const percent = Math.round((event.loaded / event.total) * 100); uploadProgressContainer.style.display = 'block'; uploadProgressBar.style.width = percent + '%'; uploadProgressText.textContent = `${translations.uploading} ${file.name}... ${percent}%`; } };
+            cancelUploadBtn.onclick = () => { if (currentUploadXHR) currentUploadXHR.abort(); };
+            
+            currentUploadXHR.send(formData);
+        });
 
         userSearchForm.addEventListener('submit', (e) => { e.preventDefault(); const query = userSearchInput.value.trim(); if (query) { socket.emit('search_user', { query }); } else { userSearchResults.innerHTML = ''; } });
-        userSearchResults.addEventListener('click', (e) => { if (e.target.classList.contains('add-btn') && !e.target.disabled) { const username = e.target.dataset.username; socket.emit('send_friend_request', { username }); e.target.textContent = '已发送'; e.target.disabled = true; } });
-        friendRequestsList.addEventListener('click', (e) => { if(e.target.classList.contains('accept-btn') || e.target.classList.contains('decline-btn')) { const username = e.target.dataset.username; const accept = e.target.classList.contains('accept-btn'); socket.emit('respond_to_friend_request', { username, accept }); document.getElementById(`request-${username}`).remove(); if(!friendRequestsList.hasChildNodes()) { friendRequestsList.innerHTML = '<p>没有新的好友请求</p>'; } } });
-
+        userSearchResults.addEventListener('click', (e) => { if (e.target.classList.contains('add-btn') && !e.target.disabled) { const username = e.target.dataset.username; socket.emit('send_friend_request', { username }); e.target.textContent = translations.request_sent; e.target.disabled = true; } });
+        friendRequestsList.addEventListener('click', (e) => { if(e.target.classList.contains('accept-btn') || e.target.classList.contains('decline-btn')) { const username = e.target.dataset.username; const accept = e.target.classList.contains('accept-btn'); socket.emit('respond_to_friend_request', { username, accept }); document.getElementById(`request-${username}`).remove(); if(!friendRequestsList.hasChildNodes()) { friendRequestsList.innerHTML = `<p>${translations.no_friend_requests}</p>`; } } });
     }
     
     function bindSocketEvents() {
         socket.on('connect', () => {
-            console.log('Connected!');
             inputBox.disabled = false;
             sendBtn.disabled = false;
-            inputBox.placeholder = '输入消息...';
+            inputBox.placeholder = translations.enter_message;
             socket.emit('get_initial_data');
         });
 
         socket.on('disconnect', () => {
-            console.log('Disconnected!');
             inputBox.disabled = true;
             sendBtn.disabled = true;
-            inputBox.placeholder = '已断开连接...';
+            inputBox.placeholder = translations.disconnected;
         });
 
         socket.on('initial_data_response', (data) => {
-            console.log('Received initial_data_response for status update', data);
             friends = data.friends;
             contactList.innerHTML = '';
-             if (data.friends.length === 0) {
-                contactList.innerHTML = '<p style="text-align:center; color: var(--text-secondary-color); padding: 1rem;">暂无好友</p>';
-            } else {
+             if (data.friends.length > 0) {
                 data.friends.forEach(friend => contactList.appendChild(createContactElement(friend)));
             }
         });
@@ -456,15 +436,27 @@ fileInput.addEventListener('change', (e) => {
         socket.on('chat_history_response', (data) => { if (activeContact && data.contact === activeContact.username) { messagesContainer.innerHTML = ''; data.history.forEach(msg => renderOrUpdateMessage(msg)); messagesContainer.scrollTop = messagesContainer.scrollHeight; } });
         socket.on('receive_message', (msg) => { if (msg.type === 'file_upload_cancelled') { const msgEl = document.getElementById(`msg-${msg.temp_id}`); if (msgEl) msgEl.remove(); return; } if(activeContact && (msg.sender_username === activeContact.username || msg.recipient_username === activeContact.username)) { renderOrUpdateMessage(msg); } });
         socket.on('reload_data', () => socket.emit('get_initial_data'));
-        socket.on('search_results', (results) => { userSearchResults.innerHTML = ''; if (results.length === 0) { userSearchResults.innerHTML = '<p>没有找到用户</p>'; return; } results.forEach(user => { const resultEl = document.createElement('div'); resultEl.className = 'search-result'; let buttonHTML = `<button class="add-btn" data-username="${user.username}">添加</button>`; if (user.friendship_status === 'pending') { buttonHTML = `<button class="add-btn" disabled>请求已发送</button>`; } else if (user.friendship_status === 'accepted') { buttonHTML = `<button class="add-btn" disabled>已是好友</button>`; } resultEl.innerHTML = `<div class="result-info"><img src="${user.avatar}" alt="Avatar"><span>${user.nickname} (${user.username})</span></div>${buttonHTML}`; userSearchResults.appendChild(resultEl); }); });
-        socket.on('friend_request_sent', (data) => { alert(data.message); });
+        socket.on('search_results', (results) => { 
+            userSearchResults.innerHTML = ''; 
+            if (results.length === 0) { userSearchResults.innerHTML = `<p>${translations.no_users_found}</p>`; return; } 
+            results.forEach(user => { 
+                const resultEl = document.createElement('div'); 
+                resultEl.className = 'search-result'; 
+                let buttonHTML = `<button class="add-btn" data-username="${user.username}">${translations.add}</button>`; 
+                if (user.friendship_status === 'pending') { buttonHTML = `<button class="add-btn" disabled>${translations.request_already_sent}</button>`; } 
+                else if (user.friendship_status === 'accepted') { buttonHTML = `<button class="add-btn" disabled>${translations.already_friends}</button>`; } 
+                resultEl.innerHTML = `<div class="result-info"><img src="${user.avatar}" alt="Avatar"><span>${user.nickname} (${user.username})</span></div>${buttonHTML}`; 
+                userSearchResults.appendChild(resultEl); 
+            }); 
+        });
+        socket.on('friend_request_sent', (data) => { if(data.success) { /* Maybe show a small success toast */ } else { alert(data.message) } });
         socket.on('new_friend_request', (request) => { if(!document.querySelector('#friend-requests-btn .notification-dot')) { const dot = document.createElement('div'); dot.className = 'notification-dot'; friendRequestsBtn.appendChild(dot); } updateFriendRequests([request]); });
         socket.on('status_change', (data) => {
             const statusDot = document.getElementById(`status-${data.username}`);
             if (statusDot) {
                 statusDot.className = `status-dot ${data.status}`;
                 if (activeContact && activeContact.username === data.username) {
-                    chatWithStatus.textContent = data.status === 'online' ? '在线' : '离线';
+                    chatWithStatus.textContent = data.status === 'online' ? translations.online : translations.offline;
                 }
             }
         });
