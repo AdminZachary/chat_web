@@ -76,13 +76,20 @@ document.addEventListener('DOMContentLoaded', () => {
     inputBox.addEventListener('focus', () => { setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 300); });
     window.addEventListener('resize', () => { if (document.activeElement === inputBox) { setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 100); } });
 
-    // --- 主题切换 & 模态窗口处理 ---
+    // --- 主题切换 & 模态窗口处理 (核心修改) ---
     const htmlEl = document.documentElement; const savedTheme = localStorage.getItem('theme') || 'light'; htmlEl.className = savedTheme; themeSwitcherBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
     themeSwitcherBtn.addEventListener('click', () => { const newTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark'; htmlEl.className = newTheme; themeSwitcherBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙'; localStorage.setItem('theme', newTheme); });
-    addFriendBtn.onclick = () => addFriendModal.style.display = 'block';
-    friendRequestsBtn.onclick = () => { friendRequestsModal.style.display = 'block'; const dot = friendRequestsBtn.querySelector('.notification-dot'); if(dot) dot.remove(); };
-    closeBtns.forEach(btn => btn.onclick = () => modals.forEach(m => m.style.display = 'none'));
-    window.onclick = (e) => modals.forEach(m => { if(e.target == m) m.style.display = 'none'; });
+    
+    // **核心修改：使用 classList.add/remove('show') 代替 style.display**
+    addFriendBtn.onclick = () => addFriendModal.classList.add('show');
+    friendRequestsBtn.onclick = () => { 
+        friendRequestsModal.classList.add('show'); 
+        const dot = friendRequestsBtn.querySelector('.notification-dot'); 
+        if(dot) dot.remove(); 
+    };
+    closeBtns.forEach(btn => btn.onclick = () => modals.forEach(m => m.classList.remove('show')));
+    window.onclick = (e) => modals.forEach(m => { if(e.target == m) m.classList.remove('show'); });
+
 
     // --- Emoji 功能 ---
     const emojis = ['😀', '😂', '😊', '😍', '🤔', '👍', '🙏', '🎉', '🚀', '❤️', '🔥', '💯'];
@@ -122,9 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!sender) { console.error("Could not find sender for message:", msg); return; }
 
         let bubbleHTML;
-        // ======================================================================
-        // **核心修复：创建一个统一的变量来获取消息类型**
-        // ======================================================================
         const messageType = msg.type || msg.message_type;
 
         switch (messageType) {
@@ -134,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">${uploadingText}</span></div></div>`;
                 break;
             case 'file':
-                // 使用统一的变量来获取文件链接
                 const fileUrl = msg.url || msg.file_url;
                 bubbleHTML = `<a href="${fileUrl}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || '文件'}</span></div></a>`;
                 break;
