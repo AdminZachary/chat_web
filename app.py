@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_socketio import SocketIO, join_room, leave_room
 import database as db
-# 新增：导入 datetime 用于处理时间
 from datetime import datetime, timezone
 
 # --- 应用设置 ---
@@ -21,14 +20,40 @@ online_users = {}
 
 db.init_db()
 
-# --- HTTP 路由 (只有 register 函数有修改) ---
+# --- HTTP 路由 (核心修改) ---
 @app.route('/')
 def index():
-    if 'username' not in session: return redirect(url_for('auth_page'))
-    return render_template('chat.html')
+    # 如果session中已有用户，理论上应该直接显示聊天界面
+    # 但为了动画效果，我们把这个判断逻辑完全交给前端
+    # 这里只提供统一的 index.html 容器
+    if 'username' in session:
+        # 如果已登录，重定向到API端点获取初始数据后，前端再处理显示
+        # 为简化，我们让已登录用户也走前端登录流程（或刷新后直接请求数据）
+        # 这里最简单的做法是，如果已经有session，登出它，强制重新登录
+        session.pop('username', None)
 
-@app.route('/auth')
-def auth_page(): return render_template('auth.html')
+    return render_template('index.html')
+
+@app.route('/api/check_session')
+def check_session():
+    if 'username' in session:
+        user_info = db.get_user(session['username'])
+        friends = db.get_friends(session['username'])
+        pending_requests = db.get_pending_requests(session['username'])
+        friends_with_status = [{'username': f['username'], 'nickname': f['nickname'], 'avatar': f['avatar'], 'status': 'offline'} for f in friends]
+        
+        initial_data = {
+            'currentUser': dict(user_info),
+            'friends': friends_with_status,
+            'pendingRequests': pending_requests
+        }
+        return jsonify({'logged_in': True, 'initial_data': initial_data})
+    return jsonify({'logged_in': False})
+
+
+# /auth 路由不再需要
+# @app.route('/auth')
+# def auth_page(): return render_template('auth.html')
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -41,13 +66,36 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json(); username, password = data.get('username'), data.get('password'); user = db.get_user(username)
-    if user and check_password_hash(user['password_hash'], password): session['username'] = username; return jsonify({'success': True})
+    data = request.get_json()
+    username, password = data.get('username'), data.get('password')
+    user = db.get_user(username)
+    if user and check_password_hash(user['password_hash'], password):
+        session['username'] = username
+        
+        # 核心修改：登录成功后，立即返回聊天界面所需的初始数据
+        user_info = db.get_user(username)
+        friends = db.get_friends(username)
+        pending_requests = db.get_pending_requests(username)
+        # 此时用户还未建立socket连接，所以好友状态都先设为离线
+        friends_with_status = [{'username': f['username'], 'nickname': f['nickname'], 'avatar': f['avatar'], 'status': 'offline'} for f in friends]
+        
+        initial_data = {
+            'currentUser': dict(user_info),
+            'friends': friends_with_status,
+            'pendingRequests': pending_requests
+        }
+        
+        return jsonify({'success': True, 'initial_data': initial_data})
+        
     return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
     
 @app.route('/api/logout', methods=['POST'])
-def logout(): session.pop('username', None); return jsonify({'success': True})
+def logout():
+    # 前端会处理UI，后端只需清理session
+    session.pop('username', None)
+    return jsonify({'success': True})
 
+# --- 文件上传路由 (无变化) ---
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'username' not in session: return jsonify({'error': 'Unauthorized'}), 401
@@ -81,60 +129,56 @@ def upload_avatar():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename): return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# --- Socket.IO 事件 ---
-
+# --- Socket.IO 事件 (无变化) ---
 @socketio.on('send_message')
 def handle_send_message(data):
     sender, recipient = session.get('username'), data.get('recipient_username')
     if not all([sender, recipient]) or not db.are_friends(sender, recipient): return
-
     msg_type = data.get('type', 'text')
-    
-    # **核心修改：获取当前UTC时间，并将其转换为ISO 8601格式字符串**
-    # 示例: '2025-06-10T14:20:05.123456Z'
     now_utc = datetime.now(timezone.utc).isoformat()
-    
     message_to_forward = {
         'sender_username': sender, 'recipient_username': recipient,
-        'type': msg_type, 'timestamp': now_utc, # 使用新的ISO格式时间戳
+        'type': msg_type, 'timestamp': now_utc,
         'temp_id': data.get('temp_id')
     }
-
     if msg_type == 'text':
         message_to_forward['content'] = data.get('text')
         db.save_message(sender, recipient, message_to_forward['content'], msg_type, None, None, now_utc)
-    
     elif msg_type == 'file_uploading':
         message_to_forward['filename'] = data.get('filename')
-        # 占位消息不存入数据库
-    
     elif msg_type == 'file_upload_cancelled':
-        pass # 取消信号，仅转发
-    
+        pass
     elif msg_type == 'file':
         message_to_forward['url'] = data.get('url')
         message_to_forward['filename'] = data.get('filename')
-        # 文件消息存入数据库
         db.save_message(sender, recipient, None, msg_type, message_to_forward['url'], message_to_forward['filename'], now_utc)
-
-    # 转发给接收方
     if recipient in online_users:
         socketio.emit('receive_message', message_to_forward, room=online_users[recipient])
-    
-    # 将需要同步的消息也发回给发送方
     if msg_type in ['text', 'file']:
         socketio.emit('receive_message', message_to_forward, room=request.sid)
 
-# ... (其他所有socketio事件处理器保持不变) ...
 @socketio.on('connect')
 def handle_connect(*args, **kwargs):
     username = session.get('username');
     if not username: return
-    join_room('all_users'); online_users[username] = request.sid; socketio.emit('status_change', {'username': username, 'status': 'online'}, to='all_users'); print(f"Client connected: {username} ({request.sid}), joined room 'all_users'")
+    join_room('all_users'); online_users[username] = request.sid;
+    socketio.emit('status_change', {'username': username, 'status': 'online'}, to='all_users');
+    print(f"Client connected: {username} ({request.sid}), notifying all users.")
+    # 通知好友自己上线
+    friends = db.get_friends(username)
+    for friend in friends:
+        if friend['username'] in online_users:
+             socketio.emit('status_change', {'username': username, 'status': 'online'}, to=online_users[friend['username']])
+
 @socketio.on('disconnect')
 def handle_disconnect(*args, **kwargs):
     username = session.get('username');
-    if username in online_users: del online_users[username]; leave_room('all_users'); socketio.emit('status_change', {'username': username, 'status': 'offline'}, to='all_users'); print(f"Client disconnected: {username}, left room 'all_users'")
+    if username in online_users:
+        del online_users[username];
+        leave_room('all_users');
+        socketio.emit('status_change', {'username': username, 'status': 'offline'}, to='all_users');
+        print(f"Client disconnected: {username}, notifying all users.")
+
 @socketio.on('get_initial_data')
 def handle_get_initial_data():
     username = session.get('username');
@@ -144,15 +188,18 @@ def handle_get_initial_data():
     friends, pending_requests = db.get_friends(username), db.get_pending_requests(username)
     friends_with_status = [{'username': f['username'], 'nickname': f['nickname'], 'avatar': f['avatar'], 'status': 'online' if f['username'] in online_users else 'offline'} for f in friends]
     socketio.emit('initial_data_response', {'currentUser': dict(user_info), 'friends': friends_with_status, 'pendingRequests': pending_requests}, room=request.sid)
+
 @socketio.on('load_chat_history')
 def handle_load_chat_history(data):
     user1, user2 = session.get('username'), data.get('contact_username');
     if not all([user1, user2]): return
     history = db.get_chat_history(user1, user2); socketio.emit('chat_history_response', {'contact': user2, 'history': history}, room=request.sid)
+
 @socketio.on('search_user')
 def handle_search_user(data):
     prefix, current_user = data.get('query'), session.get('username');
     if all([prefix, current_user]): results = db.search_users_by_prefix(prefix, current_user); socketio.emit('search_results', results, room=request.sid)
+
 @socketio.on('send_friend_request')
 def handle_send_friend_request(data):
     from_user, to_user = session.get('username'), data.get('username');
@@ -160,6 +207,7 @@ def handle_send_friend_request(data):
     success, message = db.add_friend_request(from_user, to_user); socketio.emit('friend_request_sent', {'success': success, 'message': message}, room=request.sid)
     if success and to_user in online_users:
         sender_info = db.get_user(from_user); socketio.emit('new_friend_request', dict(sender_info), room=online_users[to_user])
+
 @socketio.on('respond_to_friend_request')
 def handle_respond_to_request(data):
     to_user, from_user, accept = session.get('username'), data.get('username'), data.get('accept');
@@ -174,6 +222,6 @@ if __name__ == '__main__':
     port = 5000; local_ip = '127.0.0.1'
     try: s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("8.8.8.8", 80)); local_ip = s.getsockname()[0]; s.close()
     except Exception: pass
-    print(">>> Chat Server (Timezone Fixed) is running!");
-    print("=" * 53); print(f"  Access from this machine: http://127.0.0.1:{port}/auth"); print(f"  Access from LAN devices:  http://{local_ip}:{port}/auth"); print("=" * 53)
+    print(">>> Chat Server (SPA Version) is running!");
+    print("=" * 53); print(f"  Access from this machine: http://127.0.0.1:{port}/"); print(f"  Access from LAN devices:  http://{local_ip}:{port}/"); print("=" * 53)
     eventlet.wsgi.server(eventlet.listen(('0.0.0.0', port)), app)
