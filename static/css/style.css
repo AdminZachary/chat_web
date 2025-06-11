@@ -622,3 +622,63 @@ html.dark .modal .close-btn {
         padding-top: 70px;
     }
 }
+
+/* adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/static/css/style.css */
+
+/* --- 新增：图片和视频预览样式 --- */
+.preview-container {
+    position: relative;
+    max-width: 250px;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--border-color);
+}
+
+.image-preview, .video-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.image-preview {
+    /* 用于平滑加载效果 */
+    opacity: 0; 
+    transition: opacity 0.3s;
+}
+
+.image-preview:hover, .video-preview:hover {
+    transform: scale(1.05);
+}
+
+.preview-container.uploading {
+    cursor: default;
+}
+
+.upload-spinner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.upload-spinner-overlay .spinner {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+    color: white;
+}
+
+.message.sent .preview-container {
+    border-top-right-radius: 4px;
+}
+
+.message.received .preview-container {
+    border-top-left-radius: 4px;
+}

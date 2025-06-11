@@ -130,33 +130,49 @@ def upload_avatar():
 def uploaded_file(filename): return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # --- Socket.IO 事件 (无变化) ---
+# adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/app.py
 @socketio.on('send_message')
 def handle_send_message(data):
     sender, recipient = session.get('username'), data.get('recipient_username')
-    if not all([sender, recipient]) or not db.are_friends(sender, recipient): return
+    if not all([sender, recipient]): return
+    if not db.are_friends(sender, recipient): return
+    
     msg_type = data.get('type', 'text')
     now_utc = datetime.now(timezone.utc).isoformat()
+    
     message_to_forward = {
         'sender_username': sender, 'recipient_username': recipient,
         'type': msg_type, 'timestamp': now_utc,
         'temp_id': data.get('temp_id')
     }
+
+    # 处理不同类型的消息
     if msg_type == 'text':
         message_to_forward['content'] = data.get('text')
         db.save_message(sender, recipient, message_to_forward['content'], msg_type, None, None, now_utc)
-    elif msg_type == 'file_uploading':
+    
+    # 这些是临时状态，仅转发，不存入数据库
+    elif msg_type in ['image_uploading', 'video_uploading', 'file_uploading']:
         message_to_forward['filename'] = data.get('filename')
+    
     elif msg_type == 'file_upload_cancelled':
-        pass
-    elif msg_type == 'file':
+        pass # 仅转发给接收方以移除临时消息
+
+    # 这些是最终状态，需要存入数据库
+    elif msg_type in ['image', 'video', 'file']:
         message_to_forward['url'] = data.get('url')
         message_to_forward['filename'] = data.get('filename')
+        # 使用正确的类型保存消息
         db.save_message(sender, recipient, None, msg_type, message_to_forward['url'], message_to_forward['filename'], now_utc)
+
+    # 如果接收方在线，则转发消息
     if recipient in online_users:
         socketio.emit('receive_message', message_to_forward, room=online_users[recipient])
-    if msg_type in ['text', 'file']:
+    
+    # 将消息也发回给发送方，用于确认和UI更新
+    # 这对于将临时消息更新为最终消息至关重要
+    if msg_type not in ['file_upload_cancelled']:
         socketio.emit('receive_message', message_to_forward, room=request.sid)
-
 @socketio.on('connect')
 def handle_connect(*args, **kwargs):
     username = session.get('username');

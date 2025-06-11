@@ -192,46 +192,61 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWithStatus.textContent = statusEl?.classList.contains('online') ? '在线' : '离线';
         socket.emit('load_chat_history', { contact_username: friend.username });
     }
+// adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/static/js/app.js
 
-    function renderOrUpdateMessage(msg) {
-        const tempId = msg.temp_id;
-        let msgEl = tempId ? document.getElementById(`msg-${tempId}`) : null;
-        const isSent = msg.sender_username === currentUser.username;
-        const sender = isSent ? currentUser : (friends.find(f => f.username === msg.sender_username) || { username: msg.sender_username, avatar: msg.sender_avatar, nickname: msg.sender_nickname });
+function renderOrUpdateMessage(msg) {
+    const tempId = msg.temp_id;
+    let msgEl = tempId ? document.getElementById(`msg-${tempId}`) : null;
+    const isSent = msg.sender_username === currentUser.username;
+    const sender = isSent ? currentUser : (friends.find(f => f.username === msg.sender_username) || { username: msg.sender_username, avatar: msg.sender_avatar, nickname: msg.sender_nickname });
 
-        if (!msgEl) {
-            msgEl = document.createElement('div');
-            msgEl.className = `message ${isSent ? 'sent' : 'received'}`;
-            if (tempId) msgEl.id = `msg-${tempId}`;
-            messagesContainer.appendChild(msgEl);
-        }
-        
-        if (!sender) { console.error("Could not find sender for message:", msg); return; }
-
-        let bubbleHTML;
-        const messageType = msg.type || msg.message_type;
-
-        switch (messageType) {
-            case 'file_uploading':
-                const senderNickname = isSent ? '你' : (sender.nickname || msg.sender_username);
-                const uploadingText = `${senderNickname} 正在发送: ${msg.filename || '一个文件...'}`;
-                bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">${uploadingText}</span></div></div>`;
-                break;
-            case 'file':
-                const fileUrl = msg.url || msg.file_url;
-                bubbleHTML = `<a href="${fileUrl}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || '文件'}</span></div></a>`;
-                break;
-            default:
-                bubbleHTML = `<div class="message-bubble">${msg.content}</div>`;
-                break;
-        }
-
-        const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        msgEl.innerHTML = `<img class="avatar avatar-for-${sender.username}" src="${sender.avatar}" alt="Avatar"><div class="text-content">${bubbleHTML}<div class="timestamp">${time}</div></div>`;
-        if (msg.type !== 'file_uploading') {
-             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+    if (!msgEl) {
+        msgEl = document.createElement('div');
+        msgEl.className = `message ${isSent ? 'sent' : 'received'}`;
+        if (tempId) msgEl.id = `msg-${tempId}`;
+        messagesContainer.appendChild(msgEl);
     }
+    
+    if (!sender) { console.error("Could not find sender for message:", msg); return; }
+
+    let bubbleHTML;
+    const messageType = msg.type || msg.message_type;
+
+    const imageUrl = msg.local_preview_url || msg.url || msg.file_url;
+    const videoUrl = msg.local_preview_url || msg.url || msg.file_url;
+
+    switch (messageType) {
+        case 'image_uploading':
+            bubbleHTML = `<div class="preview-container uploading"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
+            break;
+        case 'image':
+            // --- 这是被修正的行 ---
+            bubbleHTML = `<div class="preview-container"><a href="${imageUrl}" target="_blank"><img src="${imageUrl}" class="image-preview" onload="this.style.opacity=1; messagesContainer.scrollTop = messagesContainer.scrollHeight;"></a></div>`;
+            break;
+        case 'video_uploading':
+            bubbleHTML = `<div class="preview-container uploading"><video src="${videoUrl}" class="video-preview" muted loop autoplay></video><div class="upload-spinner-overlay"><div class="spinner"></div></div></div>`;
+            break;
+        case 'video':
+            bubbleHTML = `<div class="preview-container"><video src="${videoUrl}" class="video-preview" controls></video></div>`;
+            break;
+        case 'file_uploading':
+            bubbleHTML = `<div class="file-bubble uploading-bubble"><span><div class="spinner"></div></span><div class="file-info"><span class="filename">正在发送: ${msg.filename}</span></div></div>`;
+            break;
+        case 'file':
+            bubbleHTML = `<a href="${msg.url || msg.file_url}" target="_blank" class="file-bubble"><span>📄</span><div class="file-info"><span class="filename">${msg.filename || '文件'}</span></div></a>`;
+            break;
+        default: // 'text'
+            bubbleHTML = `<div class="message-bubble">${msg.content}</div>`;
+            break;
+    }
+
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    msgEl.innerHTML = `<img class="avatar avatar-for-${sender.username}" src="${sender.avatar}" alt="Avatar"><div class="text-content">${bubbleHTML}<div class="timestamp">${time}</div></div>`;
+    
+    if (!messageType.includes('uploading')) {
+         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
 
     function updateFriendRequests(requests) {
         const listIsEmpty = friendRequestsList.querySelector('p');
@@ -318,21 +333,92 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', (e) => { if (!emojiPanel.contains(e.target) && e.target !== emojiBtn) emojiPanel.style.display = 'none'; });
 
         fileBtn.addEventListener('click', () => { if (currentUploadXHR) { alert('请等待当前文件上传完成。'); return; } fileInput.click(); });
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0]; if (!file || !activeContact) return;
-            const tempId = `temp_${Date.now()}`;
-            socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_uploading', filename: file.name, temp_id: tempId, });
-            renderOrUpdateMessage({ sender_username: currentUser.username, type: 'file_uploading', filename: file.name, temp_id: tempId, timestamp: Date.now() });
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            const formData = new FormData(); formData.append('file', file); currentUploadXHR = new XMLHttpRequest(); currentUploadXHR.open('POST', '/upload', true);
-            const cleanupAndNotify = (isCancelled = false, temp_id_to_clean) => { uploadProgressContainer.style.display = 'none'; fileInput.value = ''; currentUploadXHR = null; if (isCancelled) { socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_upload_cancelled', temp_id: temp_id_to_clean }); document.getElementById(`msg-${temp_id_to_clean}`)?.remove(); } };
-            currentUploadXHR.onload = function() { let wasSuccess = false; if (currentUploadXHR.status === 200) { const result = JSON.parse(currentUploadXHR.responseText); if (result.success) { wasSuccess = true; socket.emit('send_message', { recipient_username: activeContact.username, type: 'file', url: result.file_url, filename: file.name, temp_id: tempId }); } else { alert('文件上传失败: ' + (result.error || '未知错误')); } } else { alert('文件上传失败: 服务器错误.'); } cleanupAndNotify(!wasSuccess, tempId); };
-            currentUploadXHR.onerror = () => { alert('网络错误，上传中断。'); cleanupAndNotify(true, tempId); };
-            currentUploadXHR.onabort = () => { console.log('Upload aborted.'); cleanupAndNotify(true, tempId); };
-            currentUploadXHR.upload.onprogress = function(event) { if (event.lengthComputable) { const percent = Math.round((event.loaded / event.total) * 100); uploadProgressContainer.style.display = 'block'; uploadProgressBar.style.width = percent + '%'; uploadProgressText.textContent = `正在上传 ${file.name}... ${percent}%`; } };
-            cancelUploadBtn.onclick = () => { if (currentUploadXHR) currentUploadXHR.abort(); };
-            currentUploadXHR.send(formData);
-        });
+// adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/static/js/app.js
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeContact) return;
+
+    const tempId = `temp_${Date.now()}`;
+    const fileType = file.type.split('/')[0]; // "image", "video", 或其他
+    let messageType;
+    let localPreviewUrl = null;
+
+    // 1. 判断文件类型并创建本地预览URL
+    if (fileType === 'image' || fileType === 'video') {
+        messageType = `${fileType}_uploading`;
+        localPreviewUrl = URL.createObjectURL(file);
+    } else {
+        messageType = 'file_uploading';
+    }
+
+    // 2. 发送一个 "uploading" 状态的消息，其中包含预览信息
+    const uploadingMessage = {
+        recipient_username: activeContact.username,
+        type: messageType,
+        filename: file.name,
+        temp_id: tempId,
+        // 添加本地URL用于即时预览
+        local_preview_url: localPreviewUrl 
+    };
+    socket.emit('send_message', uploadingMessage);
+    
+    // 立即使用本地预览渲染上传中的消息
+    renderOrUpdateMessage({
+        ...uploadingMessage,
+        sender_username: currentUser.username, 
+        timestamp: new Date().toISOString()
+    });
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // 3. 执行实际的上传操作
+    const formData = new FormData();
+    formData.append('file', file);
+    currentUploadXHR = new XMLHttpRequest();
+    currentUploadXHR.open('POST', '/upload', true);
+
+    const cleanupAndNotify = (isCancelled = false, temp_id_to_clean) => {
+        uploadProgressContainer.style.display = 'none';
+        fileInput.value = '';
+        currentUploadXHR = null;
+        // 释放Object URL以节省内存
+        if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+        if (isCancelled) {
+            socket.emit('send_message', { recipient_username: activeContact.username, type: 'file_upload_cancelled', temp_id: temp_id_to_clean });
+            document.getElementById(`msg-${temp_id_to_clean}`)?.remove();
+        }
+    };
+
+    currentUploadXHR.onload = function() {
+        let wasSuccess = false;
+        if (currentUploadXHR.status === 200) {
+            const result = JSON.parse(currentUploadXHR.responseText);
+            if (result.success) {
+                wasSuccess = true;
+                // 4. 上传成功后，发送带有永久URL的最终消息
+                const finalMessageType = (fileType === 'image' || fileType === 'video') ? fileType : 'file';
+                socket.emit('send_message', { 
+                    recipient_username: activeContact.username, 
+                    type: finalMessageType, 
+                    url: result.file_url, 
+                    filename: file.name, 
+                    temp_id: tempId 
+                });
+            } else {
+                alert('文件上传失败: ' + (result.error || '未知错误'));
+            }
+        } else {
+            alert('文件上传失败: 服务器错误.');
+        }
+        cleanupAndNotify(!wasSuccess, tempId);
+    };
+
+    currentUploadXHR.onerror = () => { alert('网络错误，上传中断。'); cleanupAndNotify(true, tempId); };
+    currentUploadXHR.onabort = () => { console.log('Upload aborted.'); cleanupAndNotify(true, tempId); };
+    currentUploadXHR.upload.onprogress = function(event) { if (event.lengthComputable) { const percent = Math.round((event.loaded / event.total) * 100); uploadProgressContainer.style.display = 'block'; uploadProgressBar.style.width = percent + '%'; uploadProgressText.textContent = `正在上传 ${file.name}... ${percent}%`; } };
+    cancelUploadBtn.onclick = () => { if (currentUploadXHR) currentUploadXHR.abort(); };
+    
+    currentUploadXHR.send(formData);
+});
 
         userSearchForm.addEventListener('submit', (e) => { e.preventDefault(); const query = userSearchInput.value.trim(); if (query) { socket.emit('search_user', { query }); } else { userSearchResults.innerHTML = ''; } });
         userSearchResults.addEventListener('click', (e) => { if (e.target.classList.contains('add-btn') && !e.target.disabled) { const username = e.target.dataset.username; socket.emit('send_friend_request', { username }); e.target.textContent = '已发送'; e.target.disabled = true; } });
