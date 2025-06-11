@@ -1,6 +1,8 @@
+# adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/app.py
 import os
 import time
 import socket
+import re  # 导入正则表达式模块
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -20,18 +22,11 @@ online_users = {}
 
 db.init_db()
 
-# --- HTTP 路由 (核心修改) ---
+# --- HTTP 路由 ---
 @app.route('/')
 def index():
-    # 如果session中已有用户，理论上应该直接显示聊天界面
-    # 但为了动画效果，我们把这个判断逻辑完全交给前端
-    # 这里只提供统一的 index.html 容器
     if 'username' in session:
-        # 如果已登录，重定向到API端点获取初始数据后，前端再处理显示
-        # 为简化，我们让已登录用户也走前端登录流程（或刷新后直接请求数据）
-        # 这里最简单的做法是，如果已经有session，登出它，强制重新登录
         session.pop('username', None)
-
     return render_template('index.html')
 
 @app.route('/api/check_session')
@@ -50,19 +45,39 @@ def check_session():
         return jsonify({'logged_in': True, 'initial_data': initial_data})
     return jsonify({'logged_in': False})
 
-
-# /auth 路由不再需要
-# @app.route('/auth')
-# def auth_page(): return render_template('auth.html')
-
+# --- (已更新) 注册路由，包含所有验证 ---
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
-    username, password, password_confirm, nickname = data.get('username'), data.get('password'), data.get('password_confirm'), data.get('nickname')
-    if not all([username, password, password_confirm, nickname]): return jsonify({'success': False, 'message': '所有字段均为必填项'}), 400
-    if password != password_confirm: return jsonify({'success': False, 'message': '两次输入的密码不一致'}), 400
-    if db.add_user(username, password, nickname): return jsonify({'success': True, 'message': '注册成功'})
-    return jsonify({'success': False, 'message': '用户名已存在'}), 409
+    
+    # 步骤 1: 获取并清理用户输入
+    username = data.get('username', '').strip()
+    password = data.get('password')
+    password_confirm = data.get('password_confirm')
+    nickname = data.get('nickname')
+    
+    # 步骤 2: 验证所有字段是否都已填写
+    if not all([username, password, password_confirm, nickname]): 
+        return jsonify({'success': False, 'message': '所有字段均为必填项'}), 400
+    
+    # 步骤 3: 验证用户名的字符是否合法 (只允许字母、数字和下划线)
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return jsonify({'success': False, 'message': '用户名只能包含字母、数字和下划线'}), 400
+
+    # 步骤 4: 验证两次输入的密码是否一致
+    if password != password_confirm: 
+        return jsonify({'success': False, 'message': '两次输入的密码不一致'}), 400
+    
+    # 步骤 5: 验证用户名是否已被注册
+    if db.get_user(username):
+        return jsonify({'success': False, 'message': '该用户名已被注册'}), 409
+
+    # 步骤 6: 所有验证通过，执行用户添加操作
+    if db.add_user(username, password, nickname): 
+        return jsonify({'success': True, 'message': '注册成功'})
+    
+    # 如果因其他未知数据库原因添加失败，返回一个通用错误
+    return jsonify({'success': False, 'message': '注册过程中发生未知错误'}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -72,11 +87,9 @@ def login():
     if user and check_password_hash(user['password_hash'], password):
         session['username'] = username
         
-        # 核心修改：登录成功后，立即返回聊天界面所需的初始数据
         user_info = db.get_user(username)
         friends = db.get_friends(username)
         pending_requests = db.get_pending_requests(username)
-        # 此时用户还未建立socket连接，所以好友状态都先设为离线
         friends_with_status = [{'username': f['username'], 'nickname': f['nickname'], 'avatar': f['avatar'], 'status': 'offline'} for f in friends]
         
         initial_data = {
@@ -91,11 +104,9 @@ def login():
     
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    # 前端会处理UI，后端只需清理session
     session.pop('username', None)
     return jsonify({'success': True})
 
-# --- 文件上传路由 (无变化) ---
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'username' not in session: return jsonify({'error': 'Unauthorized'}), 401
@@ -129,8 +140,9 @@ def upload_avatar():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename): return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# --- Socket.IO 事件 (无变化) ---
-# adminzachary/chat_web/chat_web-4536a49403b65fc7cc810271fe2b18e86d10ba4b/app.py
+# --- Socket.IO 事件 ---
+
+# --- (已更新) 发送消息事件，处理图片/视频预览 ---
 @socketio.on('send_message')
 def handle_send_message(data):
     sender, recipient = session.get('username'), data.get('recipient_username')
@@ -146,33 +158,27 @@ def handle_send_message(data):
         'temp_id': data.get('temp_id')
     }
 
-    # 处理不同类型的消息
     if msg_type == 'text':
         message_to_forward['content'] = data.get('text')
         db.save_message(sender, recipient, message_to_forward['content'], msg_type, None, None, now_utc)
     
-    # 这些是临时状态，仅转发，不存入数据库
     elif msg_type in ['image_uploading', 'video_uploading', 'file_uploading']:
         message_to_forward['filename'] = data.get('filename')
-    
-    elif msg_type == 'file_upload_cancelled':
-        pass # 仅转发给接收方以移除临时消息
 
-    # 这些是最终状态，需要存入数据库
+    elif msg_type == 'file_upload_cancelled':
+        pass
+
     elif msg_type in ['image', 'video', 'file']:
         message_to_forward['url'] = data.get('url')
         message_to_forward['filename'] = data.get('filename')
-        # 使用正确的类型保存消息
         db.save_message(sender, recipient, None, msg_type, message_to_forward['url'], message_to_forward['filename'], now_utc)
 
-    # 如果接收方在线，则转发消息
     if recipient in online_users:
         socketio.emit('receive_message', message_to_forward, room=online_users[recipient])
     
-    # 将消息也发回给发送方，用于确认和UI更新
-    # 这对于将临时消息更新为最终消息至关重要
     if msg_type not in ['file_upload_cancelled']:
         socketio.emit('receive_message', message_to_forward, room=request.sid)
+
 @socketio.on('connect')
 def handle_connect(*args, **kwargs):
     username = session.get('username');
@@ -180,7 +186,6 @@ def handle_connect(*args, **kwargs):
     join_room('all_users'); online_users[username] = request.sid;
     socketio.emit('status_change', {'username': username, 'status': 'online'}, to='all_users');
     print(f"Client connected: {username} ({request.sid}), notifying all users.")
-    # 通知好友自己上线
     friends = db.get_friends(username)
     for friend in friends:
         if friend['username'] in online_users:
